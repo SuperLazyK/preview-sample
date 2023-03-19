@@ -1,0 +1,132 @@
+ratprint: false$
+declare ("'", alphabetic)$
+
+symbolilze(M):= subst([ diff(q0,t,2)=ddq0
+                      , diff(q1,t,2)=ddq1
+                      , diff(q2,t,2)=ddq2
+                      , diff(q3,t,2)=ddq3
+                      , diff(q0,t,1)=dq0
+                      , diff(q1,t,1)=dq1
+                      , diff(q2,t,1)=dq2
+                      , diff(q3,t,1)=dq3
+                    ], M)$
+depends([q0, q1, q2, q3] , t)$
+
+pc0x: q0 $
+pc0y: 0$
+pc1x: pc0x + l1 * cos(q1) $
+pc1y: pc0y + l1 * sin(q1) $
+pc2x: pc1x + l2 * cos(q1 + q2) $
+pc2y: pc1y + l2 * sin(q1 + q2) $
+pc3x: pc2x + l3 * cos(q1 + q2 + q3) $
+pc3y: pc2y + l3 * sin(q1 + q2 + q3) $
+vc1x: diff(pc1x, t)$
+vc1y: diff(pc1y, t)$
+vc2x: diff(pc2x, t)$
+vc2y: diff(pc2y, t)$
+vc3x: diff(pc3x, t)$
+vc3y: diff(pc3y, t)$
+
+q0':diff(q0,t)$
+q1':diff(q1,t)$
+q2':diff(q2,t)$
+q3':diff(q3,t)$
+q0'':diff(q0',t)$
+q1'':diff(q1',t)$
+q2'':diff(q2',t)$
+q3'':diff(q3',t)$
+
+K: 1/2 * m1 * (vc1x**2 + vc1y**2)
++ 1/2 * m2 * (vc2x**2 + vc2y**2)
++ 1/2 * m3 * (vc3x**2 + vc3y**2)$
+
+U: m1 * pc1y * g + m2 * pc2y * g + m3 * pc3y * g$
+
+L : K - U $
+
+load ("f90")$
+f90_output_line_length_max:10000000$
+showmatf90(m):= for i thru length(m) do
+    for j thru length(transpose(m)) do
+    block([], printf(true,"[~d][~d] = ", i-1,j-1), f90(m[i][j]))$
+
+X : [q0, q1, q2, q3]$
+dX : [q0', q1', q2', q3']$
+ddX : [q0'', q1'', q2'', q3'']$
+
+
+rhs : (expand(diff(jacobian([L],dX), t) - jacobian([L], X)))$
+display(trigsimp(symbolilze(rhs)))$
+
+/*  A ddX + b = tau */
+H:(trigsimp(expand(trigexpand(jacobian(args(rhs)[1], ddX)))))$
+C:symbolilze(expand(transpose(rhs) - (jacobian(args(rhs)[1], ddX)).transpose(matrix(ddX))))$
+showmatf90(H)$
+showmatf90(C)$
+
+Hmac_00 : m3+m2+m1$
+Hmac_01 : (l3*m3*sin(q1)*sin(q2)-l3*m3*cos(q1)*cos(q2))*sin(q3)+((-l3*m3*cos(q1)*sin(q2))-l3*m3*sin(q1)*cos(q2))*cos(q3)+((-l2*m3)-l2*m2)*cos(q1)*sin(q2)+((-l2*m3)-l2*m2)*sin(q1)*cos(q2)+((-l1*m3)-l1*m2-l1*m1)*sin(q1)$
+Hmac_02 : (l3*m3*sin(q1)*sin(q2)-l3*m3*cos(q1)*cos(q2))*sin(q3)+((-l3*m3*cos(q1)*sin(q2))-l3*m3*sin(q1)*cos(q2))*cos(q3)+((-l2*m3)-l2*m2)*cos(q1)*sin(q2)+((-l2*m3)-l2*m2)*sin(q1)*cos(q2)$
+Hmac_03 : (l3*m3*sin(q1)*sin(q2)-l3*m3*cos(q1)*cos(q2))*sin(q3)+((-l3*m3*cos(q1)*sin(q2))-l3*m3*sin(q1)*cos(q2))*cos(q3)$
+Hmac_10 : (l3*m3*sin(q1)*sin(q2)-l3*m3*cos(q1)*cos(q2))*sin(q3)+((-l3*m3*cos(q1)*sin(q2))-l3*m3*sin(q1)*cos(q2))*cos(q3)+((-l2*m3)-l2*m2)*cos(q1)*sin(q2)+((-l2*m3)-l2*m2)*sin(q1)*cos(q2)+((-l1*m3)-l1*m2-l1*m1)*sin(q1)$
+Hmac_11 : (-2*l1*l3*m3*sin(q2)*sin(q3))+(2*l1*l3*m3*cos(q2)+2*l2*l3*m3)*cos(q3)+(2*l1*l2*m3+2*l1*l2*m2)*cos(q2)+(l3**2+l2**2+l1**2)*m3+(l2**2+l1**2)*m2+l1**2*m1$
+Hmac_12 : (-l1*l3*m3*sin(q2)*sin(q3))+(l1*l3*m3*cos(q2)+2*l2*l3*m3)*cos(q3)+(l1*l2*m3+l1*l2*m2)*cos(q2)+(l3**2+l2**2)*m3+l2**2*m2$
+Hmac_13 : (-l1*l3*m3*sin(q2)*sin(q3))+(l1*l3*m3*cos(q2)+l2*l3*m3)*cos(q3)+l3**2*m3$
+Hmac_20 : (l3*m3*sin(q1)*sin(q2)-l3*m3*cos(q1)*cos(q2))*sin(q3)+((-l3*m3*cos(q1)*sin(q2))-l3*m3*sin(q1)*cos(q2))*cos(q3)+((-l2*m3)-l2*m2)*cos(q1)*sin(q2)+((-l2*m3)-l2*m2)*sin(q1)*cos(q2)$
+Hmac_21 : (-l1*l3*m3*sin(q2)*sin(q3))+(l1*l3*m3*cos(q2)+2*l2*l3*m3)*cos(q3)+(l1*l2*m3+l1*l2*m2)*cos(q2)+(l3**2+l2**2)*m3+l2**2*m2$
+Hmac_22 : 2*l2*l3*m3*cos(q3)+(l3**2+l2**2)*m3+l2**2*m2$
+Hmac_23 : l2*l3*m3*cos(q3)+l3**2*m3$
+Hmac_30 : (l3*m3*sin(q1)*sin(q2)-l3*m3*cos(q1)*cos(q2))*sin(q3)+((-l3*m3*cos(q1)*sin(q2))-l3*m3*sin(q1)*cos(q2))*cos(q3)$
+Hmac_31 : (-l1*l3*m3*sin(q2)*sin(q3))+(l1*l3*m3*cos(q2)+l2*l3*m3)*cos(q3)+l3**2*m3$
+Hmac_32 : l2*l3*m3*cos(q3)+l3**2*m3$
+Hmac_33 : l3**2*m3$
+Himp_00 : m1 + m2 + m3$
+Himp_01 : -l1*m1*sin(q1) - l1*m2*sin(q1) - l1*m3*sin(q1) - l2*m2*sin(q1 + q2) - l2*m3*sin(q1 + q2) - l3*m3*sin(q1 + q2 + q3)$
+Himp_02 : -l2*m2*sin(q1 + q2) - l2*m3*sin(q1 + q2) - l3*m3*sin(q1 + q2 + q3)$
+Himp_03 : -l3*m3*sin(q1 + q2 + q3)$
+Himp_10 : -l1*m1*sin(q1) - l1*m2*sin(q1) - l1*m3*sin(q1) - l2*m2*sin(q1 + q2) - l2*m3*sin(q1 + q2) - l3*m3*sin(q1 + q2 + q3)$
+Himp_11 : l1**2*m1 + l1**2*m2 + l1**2*m3 + 2*l1*l2*m2*cos(q2) + 2*l1*l2*m3*cos(q2) + 2*l1*l3*m3*cos(q2 + q3) + l2**2*m2 + l2**2*m3 + 2*l2*l3*m3*cos(q3) + l3**2*m3$
+Himp_12 : l1*l2*m2*cos(q2) + l1*l2*m3*cos(q2) + l1*l3*m3*cos(q2 + q3) + l2**2*m2 + l2**2*m3 + 2*l2*l3*m3*cos(q3) + l3**2*m3$
+Himp_13 : l3*m3*(l1*cos(q2 + q3) + l2*cos(q3) + l3)$
+Himp_20 : -l2*m2*sin(q1 + q2) - l2*m3*sin(q1 + q2) - l3*m3*sin(q1 + q2 + q3)$
+Himp_21 : l1*l2*m2*cos(q2) + l1*l2*m3*cos(q2) + l1*l3*m3*cos(q2 + q3) + l2**2*m2 + l2**2*m3 + 2*l2*l3*m3*cos(q3) + l3**2*m3$
+Himp_22 : l2**2*m2 + l2**2*m3 + 2*l2*l3*m3*cos(q3) + l3**2*m3$
+Himp_23 : l3*m3*(l2*cos(q3) + l3)$
+Himp_30 : -l3*m3*sin(q1 + q2 + q3)$
+Himp_31 : l3*m3*(l1*cos(q2 + q3) + l2*cos(q3) + l3)$
+Himp_32 : l3*m3*(l2*cos(q3) + l3)$
+Himp_33 : l3**2*m3$
+
+
+f90(trigsimp(expand(trigexpand(Hmac_00 -  Himp_00))))$
+f90(trigsimp(expand(trigexpand(Hmac_01 -  Himp_01))))$
+f90(trigsimp(expand(trigexpand(Hmac_02 -  Himp_02))))$
+f90(trigsimp(expand(trigexpand(Hmac_03 -  Himp_03))))$
+f90(trigsimp(expand(trigexpand(Hmac_10 -  Himp_10))))$
+f90(trigsimp(expand(trigexpand(Hmac_11 -  Himp_11))))$
+f90(trigsimp(expand(trigexpand(Hmac_12 -  Himp_12))))$
+f90(trigsimp(expand(trigexpand(Hmac_13 -  Himp_13))))$
+f90(trigsimp(expand(trigexpand(Hmac_20 -  Himp_20))))$
+f90(trigsimp(expand(trigexpand(Hmac_21 -  Himp_21))))$
+f90(trigsimp(expand(trigexpand(Hmac_22 -  Himp_22))))$
+f90(trigsimp(expand(trigexpand(Hmac_23 -  Himp_23))))$
+f90(trigsimp(expand(trigexpand(Hmac_30 -  Himp_30))))$
+f90(trigsimp(expand(trigexpand(Hmac_31 -  Himp_31))))$
+f90(trigsimp(expand(trigexpand(Hmac_32 -  Himp_32))))$
+f90(trigsimp(expand(trigexpand(Hmac_33 -  Himp_33))))$
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

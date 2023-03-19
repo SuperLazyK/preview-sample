@@ -1,0 +1,80 @@
+ratprint: false$
+declare ("'", alphabetic)$
+th:0$
+c: cos(th)$
+s: sin(th)$
+
+X:matrix(
+    [1, 0, 0],
+    [s * x - c * y, c, s],
+    [c * x + s * y, -s, c]
+    )$
+
+Ic:matrix(
+    [I, 0, 0],
+    [0, m, 0],
+    [0, 0, m]
+)$
+
+/*
+display(invert(transpose(invert(X))) . Ic . X)$
+display(X)$
+display(Ic . X)$
+display(transpose(X) . Ic . X)$
+
+dual(inv(Xplan(0,c))) diag(Ic, m, m) Xplan(0,c)
+*/
+
+symbolilze(M):= subst([ diff(q1,t,2)=ddq1
+                      , diff(q2,t,2)=ddq2
+                      , diff(q1,t,1)=dq1
+                      , diff(q2,t,1)=dq2
+                    ], M)$
+depends([q1, q2] , t)$
+pc1x: l1 * cos(q1) $
+pc1y: l1 * sin(q1) $
+pc2x: pc1x + l2 * cos(q1 + q2) $
+pc2y: pc1y + l2 * sin(q1 + q2) $
+vc1x: diff(pc1x, t)$
+vc1y: diff(pc1y, t)$
+vc2x: diff(pc2x, t)$
+vc2y: diff(pc2y, t)$
+
+q1':diff(q1,t)$
+q2':diff(q2,t)$
+q1'':diff(q1',t)$
+q2'':diff(q2',t)$
+
+K: 1/2 * m1 * (vc1x**2 + vc1y**2)
++ 1/2 * m2 * (vc2x**2 + vc2y**2) $
+
+U: m1 * pc1y * g + m2 * pc2y * g$
+
+L : K - U $
+
+load ("f90")$
+f90_output_line_length_max:10000000$
+showmatf90(m):= for i thru length(m) do
+    for j thru length(transpose(m)) do
+    block([], printf(true,"[~d][~d] = ", i-1,j-1), f90(m[i][j]))$
+
+X : [q1, q2]$
+dX : [q1', q2']$
+ddX : [q1'', q2'']$
+rhs : (expand(diff(jacobian([L],dX), t) - jacobian([L], X)))$
+display(trigsimp(symbolilze(rhs)))$
+
+/*  A ddX + b = tau */
+A:(trigsimp(expand(trigexpand(jacobian(args(rhs)[1], ddX)))))$
+b:symbolilze(trigsimp(expand(transpose(rhs) - (jacobian(args(rhs)[1], ddX)).transpose(matrix(ddX)))))$
+showmatf90(A)$
+showmatf90(b)$
+
+
+
+
+
+
+
+
+
