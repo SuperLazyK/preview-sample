@@ -13,16 +13,13 @@ class RevoluteJoint:
     def XJ(self, q):
         return Xpln(q, [0, 0])
 
-    def S(self):
+    def S(self, q):
         return Matrix([1, 0, 0])
 
-    def T(self):
-        return Matrix([[0, 1, 0 ], [0, 0, 1]]).T
+    def vJ(self, q, dq):
+        return (self.S(q) * dq).reshape(3,1)
 
-    def vJ(self, qd):
-        return (self.S() * qd).reshape(3,1)
-
-    def cJ(self, qd):
+    def cJ(self, q, dq):
         # ring(S) == 0
         return zeros(3, 1)
 
@@ -34,18 +31,33 @@ class PrismaticJoint:
     def XJ(self, q):
         return Xpln(0, [q, 0])
 
-    def S(self):
+    def S(self, q):
         return Matrix([0, 1, 0])
 
-    def T(self):
-        return Matrix([[1, 0, 0 ], [0, 0, 1]]).T
+    def vJ(self, q, dq): # see Ex 4.6
+        return (self.S(q) * dq).reshape(3,1)
 
-    def vJ(self, qd): # see Ex 4.6
-        return (self.S() * qd).reshape(3,1)
-
-    def cJ(self, qd):
+    def cJ(self, q, dq):
         # ring(S) == 0
         return zeros(3, 1)
+
+class RackPinionJoint:
+    def __init__(self, r):
+        self.r = r
+
+    def XJ(self, q):
+        return Xpln(q, [self.r*q, 0])
+        #return Matrix([[1, 0, 0], [q*r*sin(q), cos(q), sin(q)], [q*r*cos(q), -sin(q), cos(q)]])
+
+    def S(self, q):
+        return Matrix([1, self.r*cos(q), -self.r*sin(q)])
+
+    def vJ(self, q, dq):
+        return Matrix([dq, self.r*cos(q)*dq, -self.r*sin(q)*dq])
+
+    def cJ(self, q, dq):
+        return Matrix([0, -self.r*sin(q)*dq**2, -self.r*cos(q)*dq**2])
+
 
 
 # planar inertia: M -> F
@@ -104,13 +116,13 @@ class JointLink():
         return self.joint.XJ(self.q)
 
     def vJ(self):
-        return self.joint.vJ(self.dq)
+        return self.joint.vJ(self.q, self.dq)
 
     def cJ(self):
-        return self.joint.cJ(self.dq)
+        return self.joint.cJ(self.q, self.dq)
 
     def S(self):
-        return self.joint.S()
+        return self.joint.S(self.q)
 
     # hmm... not good design
     def drawCmd(self, X_r_to, ctx):
@@ -119,11 +131,11 @@ class JointLink():
             cmds = cmds + geo.drawCmd(X_r_to)
         return cmds
 
-    def active_force(self):
+    def force(self):
         return 0
 
 class StickJointLink(JointLink):
-    def __init__(self, m, l, joint, q, dq, cx=None, Icog=None, XT=None):
+    def __init__(self, m, l, joint, q, dq, cx=None, Icog=None, XT=None, tau=0):
         if Icog is None:
             Icog = stickI(m,l)
         if cx is None:
@@ -137,13 +149,15 @@ class StickJointLink(JointLink):
         self.Xc = Xpln(0, [l/2, 0])
         self.q = q
         self.dq = dq
-        self.tau = 0
+        self.tau = tau
         self.l = l
 
     def geometries(self, ctx):
-        return [GeoCircle(0.1*ctx[self.l]), GeoLineSegment(ctx[self.l])]
+        #return [GeoCircle(0.1*ctx[self.l]), GeoLineSegment(ctx[self.l])]
+        l = ctx[self.l] if self.l in ctx else self.l
+        return [GeoLineSegment(l)]
 
-    def active_force(self):
+    def force(self):
         return self.tau
 
 class StickSpringJointLink(StickJointLink):
@@ -151,22 +165,26 @@ class StickSpringJointLink(StickJointLink):
         super().__init__(m, l, joint, q, dq)
         self.k = k
 
-    def active_force(self):
+    def force(self):
         return -self.k * self.q
 
 class WheelJointLink(JointLink):
-    def __init__(self, m, r, joint, q, dq, XT=None):
-        I = mcI(m, [0, 0], circleI(m,r))
+    def __init__(self, m, r, joint, q, dq, Icog=None, XT=None, tau=0):
+        if Icog is None:
+            Icog = circleI(m,r)
+        I = mcI(m, [0, 0], Icog)
         if XT is None:
             XT = Xpln(0, [0, 0])
         super().__init__(m, I, XT, joint, q, dq)
         #self.Ic = Ic(m, circleI(m,r))
         self.Xc = Xpln(0, [0, 0])
-        self.tau = 0
+        self.tau = tau
+        self.r = r
 
-    def active_force(self):
+    def force(self):
         return self.tau
 
     def geometries(self, ctx):
-        return [GeoCircle(ctx[r]), GeoLineSegment(ctx[r])]
+        r = ctx[self.r] if self.r in ctx else self.r
+        return [GeoCircle(r), GeoLineSegment(r)]
 

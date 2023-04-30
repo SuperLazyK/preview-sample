@@ -100,3 +100,23 @@ def crf(v):
         [0, omega, 0]
         ])
 
+
+
+if __name__ == '__main__':
+    def skew_space(v):
+        return Matrix([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+
+    q1, r = symbols('q1 r')
+    E = Matrix([[cos(q1), sin(q1), 0], [-sin(q1), cos(q1), 0], [0, 0, 1]])
+    p = Matrix([[r*q1],[0],[0]])
+    tmp1 = zeros(6)
+    tmp1[:3,:3] = E
+    tmp1[3:,3:] = E
+    tmp2 = eye(6)
+    tmp2[3:,:3] = -skew_space(p)
+    #pprint(tmp2)
+    #print(tmp2[2:5,2:5])
+    pprint((tmp1 * tmp2)[2:5,2:5])
+    print((tmp1 * tmp2)[2:5,2:5])
+    #dL = diff(Ls, 1, dt)
+

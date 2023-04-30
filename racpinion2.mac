@@ -1,0 +1,110 @@
+/*
+https://www2.akita-nct.ac.jp/libra/report/46/46038.pdf
+thは初期状態の垂直線からの振り子角度
+phiは振り子から初期状態の垂直線方向のタイヤ表面上の点への角度
+q1は初期状態の垂直線方向のタイヤ表面上の点が回転した角度
+q2は初期状態の垂直線方向のタイヤ表面上の点から車体への角度
+*/
+
+ratprint: false$
+load ("f90")$
+f90_output_line_length_max:10000000$
+declare ("'", alphabetic)$
+depends([q1, q2, th, phi] , t)$
+symbolize(M):= subst([ diff(th,t,1)=dth,
+                        diff(th,t,2)=ddth,
+                        diff(phi,t,1)=dphi,
+                        diff(phi,t,2)=ddphi,
+                        diff(q1,t,1)=dq1,
+                        diff(q1,t,2)=ddq1,
+                        diff(q2,t,1)=dq2,
+                        diff(q2,t,2)=ddq2
+                        ], M)$
+
+linearize(M):= subst([ dth**2=0,
+                       sin(th)=th,
+                       cos(th)=1
+                        ], M)$
+/* contact point */
+/* q1: rack-pinion(x) */
+/* q2: wheel-stick-joint */
+/*
+phi:-q2$
+th:q2+q1$
+*/
+
+/* phi + th is wheel rotation */
+/* phi is stick joint angle */
+xc:r*(th+phi)$
+yc:0$
+
+/* cog */
+xp:xc + l * sin(-th)$
+yp:yc + r + l * cos(-th)$
+Vx:diff(xp,t)$
+Vy:diff(yp,t)$
+
+omega:diff(phi,t)+diff(th,t)$
+/* note that omega is wheel angular velocity!!! */
+Twr:1/2*Iw*omega**2$
+TBr:1/2*Ib*(diff(th,t))**2$
+v:r * omega$
+Twt:1/2*mw*v**2$
+TBt:1/2*mb*trigsimp(Vx**2 + Vy**2)$
+U:mb*g*l*cos(th)$
+F:1/2*Dphi*diff(phi,t)**2 + 1/2*Dth*diff(th,t)**2$
+
+L:Twr+TBr+Twt+TBt-U$
+X : [phi, th]$
+dX : [diff(phi,t), diff(th,t)]$
+ddX : [diff(phi,t,2), diff(th,t,2)]$
+/*
+X : [q1, q2]$
+dX : [diff(q1,t), diff(q2,t)]$
+ddX : [diff(q1,t,2), diff(q2,t,2)]$
+*/
+rhs : ((trigsimp(expand(diff(jacobian([L],dX), t) - jacobian([L], X)))))$
+H:funmake('matrix,args(trigreduce(symbolize(trigsimp(expand(trigexpand(jacobian(args(rhs)[1], ddX))))))))$
+C:ratsimp((expand(transpose(matrix(args(symbolize(rhs))[1])) - H.transpose(symbolize(ddX)))))$
+
+H_ext:addrow(addcol(H, [0, 0]), [0, 0, 1])$
+C_ext:addrow(jacobian(linearize(args(C)), [dphi, dth, th]), [0, 1, 0])$
+
+disp(H_ext)$
+disp(C_ext)$
+
+
+/*
+mac-phi-th
+H(1,1) = (mw+mb)*r**2+Iw
+H(1,2) = l*mb*r*cos(th)+(mw+mb)*r**2+Iw
+H(2,1) = l*mb*r*cos(th)+(mw+mb)*r**2+Iw
+H(2,2) = 2*l*mb*r*cos(th)+(mw+mb)*r**2+l**2*mb+Iw+Ib
+(%i31) f90(C)
+C(1,1) = -dth**2*l*mb*r*sin(th)
+C(2,1) = (-dth**2*l*mb*r*sin(th))-g*l*mb*sin(th)
+phi: tau
+th: 0
+
+<=>
+
+mac-q1-q2
+H(1,1) = mw*r**2+mb*r**2-2*l*mb*cos(q2+q1)*r+l**2*mb+Iw+Ib
+H(1,2) = (-l*mb*cos(q2+q1)*r)+l**2*mb+Ib
+H(2,1) = (-l*mb*cos(q2+q1)*r)+l**2*mb+Ib
+H(2,2) = l**2*mb+Ib
+C(1,1) = (dq2**2+2*dq1*dq2+dq1**2)*l*mb*sin(q2+q1)*r-g*l*mb*sin(q2+q1)
+C(2,1) = -g*l*mb*sin(q2+q1)
+
+py
+H(1,1) = Ib + Iw + l**2*mb - 2*l*mb*r*cos(q1 + q2) + mb*r**2 + mw*r**2
+H(1,2) = Ib + l**2*mb - l*mb*r*cos(q1 + q2)
+H(2,1) = Ib + l**2*mb - l*mb*r*cos(q1 + q2)
+H(2,2) = Ib + l**2*mb
+C1     = l*mb*(dq1**2*r + 2*dq1*dq2*r + dq2**2*r - g)*sin(q1 + q2)
+C2     = -g*l*mb*sin(q1 + q2)
+0
+tau
+
+*/
+

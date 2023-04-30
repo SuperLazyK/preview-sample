@@ -1,5 +1,6 @@
 from sympy import *
 from sym_jointlink import *
+import scipy
 #from sympy import init_printing
 #init_printing() 
 
@@ -154,7 +155,7 @@ class LinkTreeModel:
     def calc_H_C_tau(self, fext=None):
         if fext is None:
             fext = [zeros(self.dim, 1) for i in range(self.NB)]
-        tau = Matrix([jl.active_force() for jl in self.jointlinks])
+        tau = Matrix([jl.force() for jl in self.jointlinks])
         C = self.inverse_dynamics([0 for i in range(self.NB)], fext)
         H = self.composite_inertia()
         return H, C, tau
@@ -181,14 +182,15 @@ class LinkTreeModel:
         return I, m, cog
 
     # foward dynqmics
-    def gen_ddq_f(self, q_sym_list, dq_sym_list, ctx, fext=None):
+    def gen_ddq_f(self, q_sym_list, dq_sym_list, other_sym_list=[], ctx={}, fext=None):
         H, C, tau = self.calc_H_C_tau(fext)
-        q_dq = q_sym_list +  dq_sym_list
-        Hevalf = lambdify(q_dq, H.subs(ctx))
-        rhs = lambdify(q_dq, (tau - C).subs(ctx))
-        def ddq_f(qv, dqv):
-            b = rhs(*qv, *dqv).reshape(-1)
-            return np.linalg.solve(Hevalf(*qv, *dqv), b)
+        syms = q_sym_list +  dq_sym_list + other_sym_list
+        Hevalf = lambdify(syms, H.subs(ctx))
+        rhs = lambdify(syms, (tau - C).subs(ctx))
+        def ddq_f(qv, dqv, uv):
+            b = rhs(*qv, *dqv, *uv).reshape(-1)
+            A = Hevalf(*qv, *dqv, *uv)
+            return np.linalg.solve(A, b)
         return ddq_f
 
 
@@ -231,6 +233,9 @@ class LinkTreeModel:
 #
 
 g = symbols('g')
+r,l,th,phi,Iw,Ib,mw,mb = symbols('r l th phi Iw Ib mw mb')
+dth,dphi = symbols('dth dphi')
+ddth,ddphi = symbols('ddth ddphi')
 q1, dq1, l1, m1 = symbols('q1 dq1 l1 m1')
 q2, dq2, l2, m2 = symbols('q2 dq2 l2 m2')
 q3, dq3, l3, m3 = symbols('q3 dq3 l3 m3')
@@ -336,6 +341,7 @@ def test_2link_view():
         dq[:2] = dq[:2] + ddq * dt
         q = q + dq * dt
 
+        #scipy.integrate.RK45(ddq, t, q, dq)
         k = model.kinetic_energy()
         cmds = draw_cmds(q, dq)
         viewer.clear()
@@ -343,6 +349,7 @@ def test_2link_view():
         viewer.text([f"t: {t:.03f} :q {q[0]:.03f} {q[1]:.03f} {q[2]:.03f}"])
         viewer.draw(cmds)
         viewer.flush(dt)
+
 
 if __name__ == '__main__':
     #test_2link()

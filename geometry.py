@@ -39,7 +39,7 @@ def test_draw():
         viewer.handle_event(graphic.default_event_handler)
         viewer.draw(cmd1)
         viewer.draw(cmd2)
-        viewer.flush()
+        viewer.flush(0.03)
 
 
 if __name__ == '__main__':

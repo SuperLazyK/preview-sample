@@ -1,0 +1,72 @@
+/*
+https://www2.akita-nct.ac.jp/libra/report/46/46038.pdf
+thは初期状態の垂直線からの振り子角度
+phiは振り子から初期状態の垂直線方向のタイヤ表面上の点への角度
+q1は初期状態の垂直線方向のタイヤ表面上の点が回転した角度
+q2は初期状態の垂直線方向のタイヤ表面上の点から車体への角度
+*/
+
+ratprint: false$
+load ("f90")$
+f90_output_line_length_max:10000000$
+declare ("'", alphabetic)$
+depends([q1, q2, th, phi] , t)$
+symbolize(M):= subst([ diff(th,t,1)=dth,
+                        diff(th,t,2)=ddth,
+                        diff(phi,t,1)=dphi,
+                        diff(phi,t,2)=ddphi,
+                        diff(q1,t,1)=dq1,
+                        diff(q1,t,2)=ddq1,
+                        diff(q2,t,1)=dq2,
+                        diff(q2,t,2)=ddq2
+                        ], M)$
+
+/* contact point */
+/* q1: rack-pinion(x) */
+/* q2: wheel-stick-joint */
+/*
+phi:-q2$
+th:q2+q1$
+*/
+
+/* phi + th is wheel rotation */
+/* phi is stick joint angle */
+xc:r*(th+phi)$
+yc:0$
+
+/* cog */
+xp:xc + l * sin(th)$
+yp:yc + r + l * cos(th)$
+Vx:diff(xp,t)$
+Vy:diff(yp,t)$
+
+omega:diff(phi,t)+diff(th,t)$
+/* note that omega is wheel angular velocity!!! */
+Twr:1/2*Iw*omega**2$
+TBr:1/2*Ib*(diff(th,t))**2$
+v:r * omega$
+Twt:1/2*mw*v**2$
+TBt:1/2*mb*trigsimp(Vx**2 + Vy**2)$
+U:mb*g*l*cos(th)$
+F:1/2*Dphi*diff(phi,t)**2 + 1/2*Dth*diff(th,t)**2$
+
+L:Twr+TBr+Twt+TBt-U$
+X : [phi, th]$
+dX : [diff(phi,t), diff(th,t)]$
+ddX : [diff(phi,t,2), diff(th,t,2)]$
+rhs : ((trigsimp(expand(diff(jacobian([L],dX), t) - jacobian([L], X)))))$
+H:symbolize(trigsimp(expand(trigexpand(jacobian(args(rhs)[1], ddX)))))$
+
+C:expand(transpose(matrix(args(symbolize(rhs))[1])) - H.transpose(symbolize(ddX)))$
+
+linearize(M):= subst([ dth**2=0,
+                       sin(th)=th,
+                       cos(th)=1
+                        ], M)$
+
+f90(H)$
+f90(C)$
+f90(linearize(C))$
+
+
+
